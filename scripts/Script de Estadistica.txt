@@ -1,0 +1,258 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+
+df = pd.read_csv("C:/Users/HP/OneDrive - Universidad Tecnológica de Panamá/MAESTRIA EN ANALITICA DE DATOS/MODELOS PREDICTIVOS/proyecto gastos medicos/insurance.csv")
+df.head()
+
+###1. EXPLORACIÓN DEL DATASET
+# INFORMACIÓN GENERAL DEL DATASET
+
+print(f"Cantidad de Filas y Columnas: {df.shape}")
+
+# Tipos de Datos y Cantidad de VALORES FALTANTES
+print(f"Tipos de Datos y Cantidad de valores faltantes por columna:")
+print(df.info())
+
+#ESTADÍSTICAS DESCRIPTIVAS PARA LAS VARIABLES NUMÉRICAS
+numerical_stats = df.describe().T
+
+print("Estadísticos descriptivos para variables numéricas:")
+display(numerical_stats)
+
+mode_all = pd.DataFrame(df.mode().iloc[0]).T
+print("\nModa de cada columna:")
+display(mode_all)
+
+numerical_cols = df.select_dtypes(include=['number'])
+iqr = pd.DataFrame(numerical_cols.quantile(0.75) - numerical_cols.quantile(0.25)).T
+iqr.index = ['IQR']
+print("\nRango Intercuartílico (IQR):")
+display(iqr)
+
+#### DISTRIBUCIÓN DE VARIABLES
+#a. VARIABLES NUMÉRICAS
+col_num = ['age', 'bmi', 'children', 'charges']
+for col in col_num:
+    plt.figure(figsize=(6,4))
+    sns.histplot(df[col], kde=True, bins=30)
+    plt.title(f'Distribución de {col}')
+    plt.xlabel(col)
+    plt.ylabel('Frecuencia')
+    plt.grid(True)
+    plt.savefig(f'distribucion_{col}.png')
+    plt.show()
+
+#b. VARIABLES CATEGÓRICAS
+col_cat = ['sex', 'smoker', 'region']
+
+# FRECUENCIA EN VARIABLES CATEGÓRICAS
+categorical_cols = df.select_dtypes(include='object').columns
+print("\nFrecuencias de variables categóricas:")
+for col in categorical_cols:
+    freq = pd.DataFrame({
+        'Frecuencia absoluta': df[col].value_counts(),
+        'Frecuencia relativa (%)': df[col].value_counts(normalize=True) * 100
+    }).round(2)
+    print(f"\n{col}:")
+    display(freq)
+
+for col in col_cat:
+    plt.figure(figsize=(5,3))
+    sns.countplot(data=df, x=col)
+    plt.title(f'Frecuencia de {col}')
+    plt.grid(True)
+    plt.savefig(f'frecuencia_{col}.png')  # Línea agregada para guardar la imagen
+    plt.show()
+
+#BLOXPOTS
+
+plt.figure(figsize=(15, 12))
+
+plt.subplot(3, 3, 1)
+sns.boxplot(data=df, y='bmi', color='orange')
+plt.title("Índice de Masa Corporal")
+
+plt.subplot(3, 3, 2)
+sns.boxplot(data=df, y='charges', color='lightgreen')
+plt.title("Costo del Seguro")
+
+plt.subplot(3, 3, 3)
+sns.boxplot(data=df, y='age', color='skyblue')
+plt.title("Edad")
+
+plt.subplot(3, 3, 4)
+sns.boxplot(data=df, y='children', color='pink')
+plt.title("Número de Hijos")
+
+plt.tight_layout()
+plt.savefig('boxplots_variables_numericas.png')
+plt.show()
+
+#### Análisis de Variabilidad (Coeficiente de Variación)
+
+cv = df[col_num].std() / df[col_num].mean()
+print("Coeficiente de Variación por variable numérica:")
+print(cv.round(3))
+
+# MAPA DE CALOR DE CORRELACIONES
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm')
+plt.title("Mapa de Calor de Correlaciones")
+plt.tight_layout()
+plt.savefig('mapa_calor_correlaciones.png')  # Línea agregada para guardar la imagen
+plt.show()
+
+#RELACION ENTRE VARIABLES Y CHARGES
+variables_numericas = ['age', 'bmi', 'children']
+
+for col in variables_numericas:
+    plt.figure(figsize=(7, 5))
+    sns.regplot(x=col, y='charges', data=df, lowess=True, scatter_kws={'alpha':0.3}, line_kws={"color": "red"})
+    plt.title(f'Relación entre {col.capitalize()} y Charges')
+    plt.xlabel(col.capitalize())
+    plt.ylabel('Charges')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f'relacion_{col}.png')  # Línea agregada para guardar la imagen
+    plt.show()
+
+#Análisis de R² Individual (Regresión Simple)
+
+#Para esto, hacemos una regresión lineal de charges con cada columna numérica por separado
+
+for col in ['age', 'bmi', 'children']:
+    X = df[[col]]
+    y = df['charges']
+    model = LinearRegression().fit(X, y)
+    r2 = model.score(X, y)
+    print(f'R² de charges ~ {col}: {r2:.4f}')
+
+#### 2. VERIFICACIÓN DE VALORES DUPLICADOS Y VALORES ÚNICOS PARA LAS COLUMNAS CATEGÓRICAS
+
+#VALORES DUPLICADOS
+print(f"Duplicados: {df.duplicated().sum()}")
+
+#VALORES NULOS POR COLUMNA
+print("Valores nulos por columna:\n", df.isnull().sum())
+
+# VALORES ÚNICOS - COLUMNAS CATEGÓRICAS
+
+for col in ['sex', 'smoker', 'region']:
+    print(f"\nValores únicos en '{col}': {df[col].unique()}")
+
+##### 3. LIMPIEZA DE LOS DATOS
+
+#a. Eliminar el valor duplicado
+
+df = df.drop_duplicates()
+
+#VALORES DUPLICADOS DESPUES DE LA LIMPIEZA
+print(f"Duplicados: {df.duplicated().sum()}")
+
+#CANTIDAD DE COLUMNAS DESPUES DE LA LIMPIEZA
+
+print(f"Cantidad de Filas y Columnas: {df.shape}")
+
+# Tipos de Datos y Cantidad de VALORES FALTANTES
+df.info()
+
+#TRABAJAMOS ENTONCES CON 1,337 FILAS Y 7 COLUMNAS. SIN VALORES NULOS, NI DUPLICADOS
+
+
+#CODIFICACION DE VARIABLES CATEGORICAS
+
+# Recordamos cuales son nuetros valores únicos para cada columna categórica
+print("Valores únicos por columna categórica:")
+print("sex:", df['sex'].unique())
+print("smoker:", df['smoker'].unique())
+print("region:", df['region'].unique())
+
+
+# Transformamos las columnas categóricas para trabajar con variables dummies
+df_codificado = df.copy()
+df_codificado = pd.get_dummies(df_codificado, columns=['sex', 'smoker', 'region'], drop_first=True)
+
+
+# Se crearon nuevas columnas para codificar la variable: region
+print("\n Se crearon nuevas columnas para codificar la variable: region")
+print(df_codificado.head())
+
+# BOXPLOTS
+
+# Boxplot de charges según si fuma o no
+plt.figure(figsize=(7, 4))
+sns.boxplot(x='smoker_yes', y='charges', data=df_codificado)
+plt.xticks([0, 1], ['No fumador', 'Fumador'])
+plt.title("Costo del Seguro según Si es Fumador")
+plt.xlabel("Fumador")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.savefig('boxplot_fumador.png')  # Línea agregada para guardar la imagen
+plt.show()
+
+# Boxplot de charges según el género
+plt.figure(figsize=(7, 4))
+sns.boxplot(x='sex_male', y='charges', data=df_codificado)
+plt.xticks([0, 1], ['Mujer', 'Hombre'])
+plt.title("Costo del Seguro según Género")
+plt.xlabel("Sexo")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.savefig('boxplot_genero.png')  # Línea agregada para guardar la imagen
+plt.show()
+
+# Boxplot según la región. Para ello tenemos que volver a crear la columna de Region
+region_columns = [col for col in df_codificado.columns if col.startswith('region_')]
+region_map = {
+    'region_northwest': 'Northwest',
+    'region_southeast': 'Southeast',
+    'region_southwest': 'Southwest'
+}
+
+df_codificado['region'] = 'Northeast'
+for col in region_map:
+    df_codificado.loc[df_codificado[col] == 1, 'region'] = region_map[col]
+
+plt.figure(figsize=(8, 5))
+sns.boxplot(x='region', y='charges', data=df_codificado)
+plt.title("Costo del Seguro por Región")
+plt.xlabel("Región")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.savefig('boxplot_region.png')  # Línea agregada para guardar la imagen
+plt.show()
+
+
+#VALOR DE R2 PARA CADA VARIABLE CODIFICADA
+
+# Seleccionamos columnas binarias que fueron creadas al codificar
+binary_cols = ['sex_male', 'smoker_yes', 
+               'region_northwest', 'region_southeast', 'region_southwest']
+
+print("Correlación con charges:")
+for col in binary_cols:
+    corr = df_codificado[col].astype(int).corr(df['charges'])
+    print(f"{col}: {corr:.4f}")
+
+print("\nR² (Regresión lineal simple) con charges:")
+for col in binary_cols:
+    X = df_codificado[[col]].astype(int)
+    y = df_codificado['charges']
+    model = LinearRegression().fit(X, y)
+    r2 = model.score(X, y)
+    print(f"{col}: R² = {r2:.4f}")
+
+
+#GUARDAMOS EL DATASET CODIFICADO
+filename = 'Dataset_Codificado.csv'
+df_codificado.to_csv(filename, index=False)
+
