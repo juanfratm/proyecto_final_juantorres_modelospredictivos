@@ -1,0 +1,204 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.tree import DecisionTreeRegressor
+
+df = pd.read_csv("C:/Users/HP/OneDrive - Universidad Tecnológica de Panamá/MAESTRIA EN ANALITICA DE DATOS/MODELOS PREDICTIVOS/proyecto gastos medicos - cambios del profesor/PROCESO DE CAMBIOS/charges/Dataset_Codificado.csv")
+df.head()
+
+#ANÁLISIS ESTADÍSTICO DE CHARGES
+# Estadísticos descriptivos
+charges_stats = df[['charges']].describe().T
+print("Estadísticos descriptivos para la variable 'charges':")
+display(charges_stats)
+
+# Moda
+charges_mode = pd.DataFrame(df[['charges']].mode().iloc[0]).T
+print("\nModa de la variable 'charges':")
+display(charges_mode)
+
+# Rango Intercuartílico (IQR)
+charges_iqr = pd.DataFrame(df[['charges']].quantile(0.75) - df[['charges']].quantile(0.25)).T
+charges_iqr.index = ['IQR']
+print("\nRango Intercuartílico (IQR) de la variable 'charges':")
+display(charges_iqr)
+
+
+#### DISTRIBUCIÓN DE CHARGES
+
+col_num = ['charges']
+
+for col in col_num:
+    plt.figure(figsize=(6,4))
+    sns.histplot(df[col], kde=True, bins=30)
+    plt.title(f'Distribución de {col}')
+    plt.xlabel(col)
+    plt.ylabel('Frecuencia')
+    plt.grid(True)
+    plt.show()
+
+#BOXPLOT
+
+plt.figure(figsize=(15, 12))
+
+plt.subplot(1, 1, 1)
+sns.boxplot(data=df, y='charges', color='lightgreen')
+plt.title("Charges")
+
+plt.tight_layout()
+plt.show()
+
+#### Análisis de Variabilidad (Coeficiente de Variación)
+
+col_num = ['charges']
+cv = df[col_num].std() / df[col_num].mean()
+print("Coeficiente de Variación por variable numérica:")
+print(cv.round(3))
+
+#MAPA DE CALOR DE CORRELACIONES
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm')
+plt.title("Mapa de Calor de Correlaciones")
+plt.tight_layout()
+plt.show()
+
+
+#Análisis de R² Individual (Regresión Simple)
+
+#Para esto, hacemos una regresión lineal de charges con cada columna numérica por separado
+
+for col in ['age', 'bmi', 'children']:
+    X = df[[col]]
+    y = df['charges']
+    model = LinearRegression().fit(X, y)
+    r2 = model.score(X, y)
+    print(f'R² de charges ~ {col}: {r2:.4f}')
+
+# BOXPLOTS
+
+# Boxplot de Charges según si fuma o no
+plt.figure(figsize=(7, 4))
+sns.boxplot(x='smoker_yes', y='charges', data=df)
+plt.xticks([0, 1], ['No fumador', 'Fumador'])
+plt.title("Charges según si es Fumador")
+plt.xlabel("Fumador")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.show()
+
+# Boxplot de Charges según el género
+plt.figure(figsize=(7, 4))
+sns.boxplot(x='sex_male', y='charges', data=df)
+plt.xticks([0, 1], ['Mujer', 'Hombre'])
+plt.title("Charges según Género")
+plt.xlabel("Sexo")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.show()
+
+# Boxplot según la región. Para ello recreamos la columna 'region'
+region_columns = [col for col in df.columns if col.startswith('region_')]
+region_map = {
+    'region_northwest': 'Northwest',
+    'region_southeast': 'Southeast',
+    'region_southwest': 'Southwest'
+}
+
+df['region'] = 'Northeast'
+for col in region_map:
+    df.loc[df[col] == 1, 'region'] = region_map[col]
+
+plt.figure(figsize=(8, 5))
+sns.boxplot(x='region', y='charges', data=df)  # Cambiado de 'lny' a 'charges'
+plt.title("Charges según Región")
+plt.xlabel("Región")
+plt.ylabel("Charges")
+plt.tight_layout()
+plt.show()
+
+#VALOR DE R2 PARA CADA VARIABLE CODIFICADA
+
+binary_cols = ['sex_male', 'smoker_yes', 
+               'region_northwest', 'region_southeast', 'region_southwest']
+
+print("Correlación con Charges:")
+for col in binary_cols:
+    corr = df[col].astype(int).corr(df['charges'])
+    print(f"{col}: {corr:.4f}")
+
+print("\nR² (Regresión lineal simple) con Charges:")
+for col in binary_cols:
+    X = df[[col]].astype(int)
+    y = df['charges']
+    model = LinearRegression().fit(X, y)
+    r2 = model.score(X, y)
+    print(f"{col}: R² = {r2:.4f}")
+
+#SEPARAMOS NUESTRAS VARIABES X Y Y
+
+#Eliminamos las columnas no predictoras para definir nuestra X.
+
+X = df.drop(['charges', 'region'], axis=1)  # Mantenemos 'charges' como y, eliminamos 'lny'
+y = df['charges']
+
+#DIVIDIMOS NUESTRO CONJUNTO DE ENTRENAMIENTO Y PRUEBA
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print("Tamaño del set de entrenamiento:", X_train.shape)
+print("Tamaño del set de prueba:", X_test.shape)
+
+
+# ENTRENAMIENTO DEL MODELO DE REGRESIÓN GRADIENT BOOSTING
+from sklearn.ensemble import GradientBoostingRegressor
+
+model = GradientBoostingRegressor()
+model.fit(X_train, y_train)
+
+# PREDICCIONES
+y_pred = model.predict(X_test)
+
+# EVALUACIÓN DEL MODELO
+mae = mean_absolute_error(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+mape = mean_absolute_percentage_error(y_test, y_pred) * 100
+
+print(f"MAE: {mae:.2f}")
+print(f"MSE: {mse:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(f"R²: {r2:.4f}")
+print(f"MAPE: {mape:.2f}%")
+
+
+# VISUALIZACIÓN DE VALORES REALES VS VALORES DEL MODELO (PREDICCIÓN)
+plt.figure(figsize=(8, 6))
+plt.scatter(y_test, y_pred, alpha=0.5, color='blue')
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], '--r')
+plt.xlabel("Valores Reales (charges)")
+plt.ylabel("Valores Predichos")
+plt.title("REGRESIÓN GRADIENT BOOSTING: Valores Reales vs Predichos (charges)")
+plt.tight_layout()
+plt.savefig("PRECISION_REGRESION_GRADIENT_BOOSTING_CHARGES.png")
+plt.show()
+
+# GRÁFICO DE RESIDUOS
+residuos = y_test - y_pred
+plt.figure(figsize=(8, 5))
+sns.histplot(residuos, kde=True, color='orange')
+plt.title("Distribución de los Residuos (charges)")
+plt.xlabel("Error (Valor Real - Predicho)")
+plt.tight_layout()
+plt.savefig("RESIDUOS_REGRESION_GRADIENT_BOOSTING_CHARGES.png")
+plt.show()
